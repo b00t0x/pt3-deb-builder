@@ -5,7 +5,7 @@
 日次で本家リポジトリをチェックし、更新があったら自動的に deb パッケージがアップロードされます（多分）。
 
 ## ダウンロード
-[Releases](https://github.com/b00t0x/pt3-deb-builder/Releases) から  pt3-drv-dkms_x.y.z_all.deb をダウンロードしてください。
+[Releases](https://github.com/b00t0x/pt3-deb-builder/releases) から  pt3-drv-dkms_x.y.z_all.deb をダウンロードしてください。
 
 ## インストール
 ```
@@ -32,7 +32,7 @@ deb の作成方法は [tsukumijima/px4_drv](https://github.com/tsukumijima/px4_
   * [post_remove.sh](./post_remove.sh)
   * [blacklist-dvb-pt3.conf](./blacklist-dvb-pt3.conf)
     * dvb ドライバがロードされないよう post_install.sh にて導入
-* [dkms.conf](./dkms.conf) を修正 ( `Modify dkms.conf` )
+* dkms.conf を修正 ( `Modify dkms.conf` )
   * [99-pt3.rules](https://github.com/m-tsudo/pt3/blob/master/etc/99-pt3.rules) の配置は post_install.sh で行うため、make のターゲットを `dkms` から `pt3_drv.ko` に変更
 * プリセットの設定だと post_(install|remove).sh が 644 になってしまうので、対策した pt3_drv-dkms-mkdeb を配置 ( `Fix mkdeb` )
   * 参考: https://github.com/tsukumijima/px4_drv/commit/c6afab65efa4f58804d4d630da8cd2d853180abd
