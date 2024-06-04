@@ -1,0 +1,96 @@
+name: Build
+on:
+  push:
+    branches:
+    - master
+  schedule:
+    - cron: '0 1 * * *' # UTC
+
+jobs:
+  build:
+    name: Build pt3_drv deb package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone m-tsudo/pt3
+        run: git clone --depth=5 https://github.com/m-tsudo/pt3.git
+
+      - name: Get pt3 repo status
+        working-directory: pt3
+        run: |
+          echo COMMIT_HASH=$(git rev-parse --short HEAD) >> $GITHUB_ENV
+          echo TAG_NAME=v$(grep PACKAGE_VERSION dkms.conf | cut -d'"' -f2) >> $GITHUB_ENV
+
+      - name: Get last release info
+        id: last_release
+        uses: cardinalby/git-get-release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          latest: true
+
+      - name: Check updates
+        run: |
+          LAST_HASH=$(echo "${{ steps.last_release.outputs.name }}" | cut -d'-' -f2)
+          if [ "${COMMIT_HASH}" != "${LAST_HASH}" ]; then
+            echo RUN_BUILD=yes >> $GITHUB_ENV
+          fi
+          echo "COMMIT_HASH: ${LAST_HASH} => ${COMMIT_HASH}"
+
+      - name: Setup apt packages
+        if: env.RUN_BUILD == 'yes'
+        run: sudo apt-get install -y debhelper devscripts dh-exec dkms dpkg
+
+      - name: Copy files
+        if: env.RUN_BUILD == 'yes'
+        run: |
+          cp post_install.sh post_remove.sh pt3/
+          cp blacklist-dvb-pt3.conf pt3/etc/
+
+      - name: Modify dkms.conf
+        if: env.RUN_BUILD == 'yes'
+        working-directory: pt3
+        run: |
+          sed -i 's/ dkms"/ pt3_drv.ko"/' dkms.conf
+          echo 'POST_INSTALL="post_install.sh"' >> dkms.conf
+          echo 'POST_REMOVE="post_remove.sh"' >> dkms.conf
+
+      - name: Fix mkdeb
+        if: env.RUN_BUILD == 'yes'
+        working-directory: pt3
+        run: |
+          cp -r /etc/dkms/template-dkms-mkdeb pt3_drv-dkms-mkdeb
+          sed -i 's/chmod 644 -R/#chmod 644 -R/' pt3_drv-dkms-mkdeb/Makefile
+
+      - name: Build deb package
+        if: env.RUN_BUILD == 'yes'
+        working-directory: pt3
+        run: dkms mkdeb --source-only
+
+      - name: Generate Release Notes
+        if: env.RUN_BUILD == 'yes'
+        working-directory: pt3
+        run: |
+          echo '### The latest five updates are:' >> ../ReleaseNotes.md
+          git log -"5" --format="- [\`%h\`](https://github.com/m-tsudo/pt3/commit/%H) %s" >> ../ReleaseNotes.md
+
+      - name: Publish GitHub Release
+        if: env.RUN_BUILD == 'yes'
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          name: ${{ env.TAG_NAME }}-${{ env.COMMIT_HASH }}
+          bodyFile: ReleaseNotes.md
+          artifacts: ./*.deb
+          tag: ${{ env.TAG_NAME }}-${{ env.COMMIT_HASH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discord notification
+        uses: sarisia/actions-status-discord@v1
+        if: env.RUN_BUILD == 'yes'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          content: |
+            A new pt3 deb package has been built. See below.
+            - https://github.com/b00t0x/pt3-deb-builder/releases
+            - https://github.com/m-tsudo/pt3
