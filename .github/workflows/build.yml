@@ -4,7 +4,7 @@ on:
     branches:
     - master
   schedule:
-    - cron: '0 1 * * *' # UTC
+    - cron: '0 1 1,10,20 * *' # UTC
 
 jobs:
   build:
